@@ -30,7 +30,7 @@ var client = http.Client{}
 var lastDuration = 0 * time.Second
 var maxDuration = 15 * time.Minute
 
-func push(apiKey string, endpoint string) {
+func push(apiKey string, endpoint string, uuid string) {
 	for {
 		l := len(queue)
 		if l == 0 {
@@ -53,7 +53,7 @@ func push(apiKey string, endpoint string) {
 
 		req, _ := http.NewRequest("POST", endpoint, body)
 		req.Header.Add("X-API-Key", apiKey)
-		req.Header.Add("albumuuid", "")
+		req.Header.Add("albumuuid", uuid)
 		req.Header.Add("Content-Type", writer.FormDataContentType())
 
 		response, err := client.Do(req)
@@ -116,7 +116,7 @@ func main() {
 		log.Println("Error loading .env file")
 	}
 
-	go push(os.Getenv("API_KEY"), os.Getenv("ENDPOINT"))
+	go push(os.Getenv("API_KEY"), os.Getenv("ENDPOINT"), os.Getenv("ALBUM"))
 	http.HandleFunc("/upload", upload)
 	log.Println("Listening on :14994")
 	err := http.ListenAndServe("localhost:14994", nil)
