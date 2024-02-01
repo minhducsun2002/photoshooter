@@ -26,13 +26,21 @@ type UploadResponse struct {
 var queue = make(chan Entry, 300)
 var client = http.Client{}
 
+// backoff counter
+var lastDuration = 0 * time.Second
+var maxDuration = 15 * time.Minute
+
 func push(apiKey string, endpoint string) {
 	for {
 		l := len(queue)
 		if l == 0 {
-			time.Sleep(1 * time.Second)
+			time.Sleep(5 * time.Second)
 			continue
 		}
+
+		// wait
+		lastDuration = min(lastDuration, maxDuration)
+		time.Sleep(lastDuration)
 
 		entry := <-queue
 
@@ -51,11 +59,23 @@ func push(apiKey string, endpoint string) {
 		response, err := client.Do(req)
 		if err != nil {
 			log.Printf("Error uploading file %s : %s", entry.Name, err)
+			queue <- entry
+			if lastDuration == 0*time.Second {
+				lastDuration = 1 * time.Second
+			} else {
+				lastDuration *= 2
+			}
 			continue
 		}
 
 		if response.StatusCode != 200 {
 			log.Printf("Error uploading file %s : Response status was %d", entry.Name, response.StatusCode)
+			queue <- entry
+			if lastDuration == 0*time.Second {
+				lastDuration = 1 * time.Second
+			} else {
+				lastDuration *= 3
+			}
 			continue
 		}
 
@@ -67,6 +87,7 @@ func push(apiKey string, endpoint string) {
 		}
 
 		log.Printf("Uploaded as %s", r.Name)
+		lastDuration = 0 * time.Second
 	}
 }
 
