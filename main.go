@@ -3,12 +3,16 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/joho/godotenv"
 	"io"
 	"log"
+	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -46,8 +50,16 @@ func push(apiKey string, endpoint string, uuid string) {
 
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
-		part, _ := writer.CreateFormFile("file", entry.Name)
-		_, _ = part.Write(entry.Content)
+		mimeType := mime.TypeByExtension(filepath.Ext(entry.Name))
+		if mimeType == "" {
+			mimeType = "application/octet-stream"
+		}
+
+		headers := make(textproto.MIMEHeader)
+		headers.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", entry.Name))
+		headers.Set("Content-Type", mimeType)
+		content, _ := writer.CreatePart(headers)
+		_, _ = content.Write(entry.Content)
 
 		_ = writer.Close()
 
@@ -106,9 +118,6 @@ func upload(w http.ResponseWriter, req *http.Request) {
 
 	queue <- Entry{Name: name, Content: content}
 	log.Printf("Queued file %s with size %d", name, len(content))
-
-	req.Header.Add("albumuuid", "")
-	req.Header.Add("Accept", "*/*")
 }
 
 func main() {
